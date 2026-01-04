@@ -33,28 +33,33 @@
           <span>Temperature</span>
           <component :is="BeakerIcon" class="icon-sm text-red-500" />
         </div>
-        <div class="value green-text">24.5°C</div>
+        <div class="value green-text">{{ store.sensors.temperature }}°C</div>
       </div>
+
       <div class="card sensor-card">
         <div class="card-header">
           <span>Humidity</span>
           <component :is="CloudIcon" class="icon-sm text-blue-500" />
         </div>
-        <div class="value green-text">65.3%</div>
+        <div class="value green-text">{{ store.sensors.humidity }}%</div>
       </div>
+
       <div class="card sensor-card">
         <div class="card-header">
           <span>Soil Moisture</span>
           <component :is="SunIcon" class="icon-sm text-green-500" />
         </div>
-        <div class="value green-text">41.0%</div>
+        <div class="value green-text">{{ store.sensors.moisture }}%</div>
       </div>
+
       <div class="card sensor-card">
         <div class="card-header">
           <span>Rain Intensity</span>
           <component :is="BoltIcon" class="icon-sm text-yellow-500" />
         </div>
-        <div class="value green-text">72.7%</div>
+        <div class="value green-text">
+          {{ store.sensors.rain }}%
+        </div>
       </div>
     </div>
 
@@ -84,7 +89,6 @@
         </div>
       </div>
     </div>
-    </div>
 
     <div class="grid-2 bottom-section">
       
@@ -96,15 +100,31 @@
         <div v-if="!isAutoMode" class="pump-controls">
           <div class="pump-row">
             <span>💧 Watering Pump</span>
-            <span class="badge">Idle</span>
+            <span class="badge" :style="{ background: store.controls.pump_water ? '#86efac' : '#f1f5f9' }">
+              {{ store.controls.pump_water ? 'Active' : 'Idle' }}
+            </span>
           </div>
-          <button class="btn btn-primary" @click="togglePump('water')">Start Watering</button>
+          <button 
+            class="btn btn-primary" 
+            @click="togglePump('water')"
+            :style="{ opacity: store.controls.pump_water ? '0.7' : '1' }"
+          >
+            {{ store.controls.pump_water ? 'Stop Watering' : 'Start Watering' }}
+          </button>
           
           <div class="pump-row mt-4">
             <span>🧪 Fertilizer Pump</span>
-            <span class="badge">Idle</span>
+            <span class="badge" :style="{ background: store.controls.pump_fert ? '#86efac' : '#f1f5f9' }">
+              {{ store.controls.pump_fert ? 'Active' : 'Idle' }}
+            </span>
           </div>
-          <button class="btn btn-primary" @click="togglePump('fertilizer')">Start Fertilizing</button>
+          <button 
+            class="btn btn-primary" 
+            @click="togglePump('fertilizer')"
+            :style="{ opacity: store.controls.pump_fert ? '0.7' : '1' }"
+          >
+            {{ store.controls.pump_fert ? 'Stop Fertilizing' : 'Start Fertilizing' }}
+          </button>
         </div>
 
         <div v-else class="auto-message">
@@ -129,108 +149,60 @@
         </div>
       </div>
     </div>
+  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useGardenStore } from '../stores/gardenStore'; // Correct Store Import
 
-// 1. Import Icons from Heroicons
+// 1. Import Icons
 import { 
-  BeakerIcon, 
-  CloudIcon, 
-  BoltIcon, 
-  SunIcon, 
-  SparklesIcon 
+  BeakerIcon, CloudIcon, BoltIcon, SunIcon, SparklesIcon 
 } from '@heroicons/vue/24/outline';
 
-// 2. Import Chart.js components
+// 2. Import Chart.js
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend
 } from 'chart.js';
 import { Line } from 'vue-chartjs';
 
-// 3. Register ChartJS components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
+// 3. Register ChartJS
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
-// --- STATE ---
-const isAutoMode = ref(false); 
+// --- CONNECT TO STORE ---
+const store = useGardenStore();
+
+// Start listening to Firebase when page loads
+onMounted(() => {
+  store.initListener();
+});
+
+// --- COMPUTED PROPERTIES ---
+// Convert Firebase String ('AUTO'/'MANUAL') to Boolean for Switch
+const isAutoMode = computed({
+  get: () => store.controls.mode === 'AUTO',
+  set: (val) => store.setMode(val ? 'AUTO' : 'MANUAL')
+});
+
 const thresholds = ref({ moisture: 30, temp: 28 });
-
-// --- DUMMY CHART DATA (Static for now) ---
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false } // Hide legend to look cleaner
-  },
-  scales: {
-    y: { beginAtZero: true }
-  }
-};
-
-const tempChartData = {
-  labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'],
-  datasets: [{
-    label: 'Temperature',
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
-    data: [24, 25, 25, 26, 26, 25],
-    tension: 0.4 // Makes the line curvy
-  }]
-};
-
-const soilChartData = {
-  labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'],
-  datasets: [{
-    label: 'Soil Moisture',
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
-    data: [60, 58, 55, 53, 50, 48],
-    tension: 0.4
-  }]
-};
-
-const humidityChartData = {
-  labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'],
-  datasets: [{
-    label: 'Humidity',
-    backgroundColor: '#8b5cf6', // Purple
-    borderColor: '#8b5cf6',
-    data: [65, 66, 68, 67, 65, 64],
-    tension: 0.4
-  }]
-};
-
-const rainChartData = {
-  labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'],
-  datasets: [{
-    label: 'Rain Intensity',
-    backgroundColor: '#0ea5e9', // Light Blue
-    borderColor: '#0ea5e9',
-    data: [0, 0, 10, 45, 80, 20], // Simulating a sudden rain shower
-    tension: 0.4
-  }]
-};
 
 // --- ACTIONS ---
 const togglePump = (type) => {
-  console.log(`Toggling ${type} pump...`);
+  // Map 'water' -> 'pump_water' / 'fertilizer' -> 'pump_fert'
+  const pumpKey = type === 'water' ? 'pump_water' : 'pump_fert';
+  
+  // Toggle the current state
+  const currentState = store.controls[pumpKey];
+  store.togglePump(pumpKey, !currentState);
 };
+
+// --- DUMMY CHART DATA ---
+const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } };
+const tempChartData = { labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'], datasets: [{ label: 'Temperature', backgroundColor: '#ef4444', borderColor: '#ef4444', data: [24, 25, 25, 26, 26, 25], tension: 0.4 }] };
+const soilChartData = { labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'], datasets: [{ label: 'Soil Moisture', backgroundColor: '#3b82f6', borderColor: '#3b82f6', data: [60, 58, 55, 53, 50, 48], tension: 0.4 }] };
+const humidityChartData = { labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'], datasets: [{ label: 'Humidity', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6', data: [65, 66, 68, 67, 65, 64], tension: 0.4 }] };
+const rainChartData = { labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'], datasets: [{ label: 'Rain Intensity', backgroundColor: '#0ea5e9', borderColor: '#0ea5e9', data: [0, 0, 10, 45, 80, 20], tension: 0.4 }] };
 </script>
 
 <style scoped>
@@ -241,7 +213,7 @@ const togglePump = (type) => {
   padding: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #2c3e50;
-  background: linear-gradient(180deg, #86efac 0%, #f0fdf4 100%); /* Very light green bg */
+  background: linear-gradient(180deg, #86efac 0%, #f0fdf4 100%);
   min-height: 100vh;
 } 
 
@@ -296,6 +268,9 @@ input:checked + .slider:before { transform: translateX(26px); }
 .badge { background: #f1f5f9; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; }
 .pump-row { display: flex; justify-content: space-between; align-items: center; }
 .mt-4 { margin-top: 1rem; }
+.auto-message { text-align: center; color: #666; }
+.status-ok { color: #15803d; font-weight: bold; }
+.sub-text { font-size: 0.85rem; color: #888; margin-top: 4px; }
 
 /* Responsive */
 @media (max-width: 768px) {
