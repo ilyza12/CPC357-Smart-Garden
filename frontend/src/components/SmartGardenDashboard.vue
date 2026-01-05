@@ -57,9 +57,7 @@
           <span>Rain Intensity</span>
           <component :is="BoltIcon" class="icon-sm text-yellow-500" />
         </div>
-        <div class="value green-text">
-          {{ store.sensors.rain }}%
-        </div>
+        <div class="value green-text">{{ store.sensors.rain }}%</div>
       </div>
     </div>
 
@@ -138,14 +136,23 @@
         
         <div class="input-group">
           <label>Soil Moisture Threshold (%)</label>
-          <input type="number" v-model="thresholds.moisture" placeholder="30">
+          <input 
+            type="number" 
+            :value="store.config.moisture_threshold" 
+            @change="updateMoisture"
+            placeholder="30"
+          >
           <p class="hint">Watering activates when soil moisture falls below this level</p>
         </div>
 
         <div class="input-group">
-          <label>Temperature Threshold (°C)</label>
-          <input type="number" v-model="thresholds.temp" placeholder="28">
-          <p class="hint">Fertilizing activates when temperature exceeds this level</p>
+          <label>Daily Fertilization Time</label>
+          <input 
+            type="time" 
+            :value="store.config.fert_time" 
+            @change="updateTime"
+          >
+          <p class="hint">Fertilizer pump activates automatically at this time</p>
         </div>
       </div>
     </div>
@@ -153,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useGardenStore } from '../stores/gardenStore'; // Correct Store Import
 
 // 1. Import Icons
@@ -185,19 +192,27 @@ const isAutoMode = computed({
   set: (val) => store.setMode(val ? 'AUTO' : 'MANUAL')
 });
 
-const thresholds = ref({ moisture: 30, temp: 28 });
+// --- UPDATED ACTIONS FOR CONFIG ---
+// Save Moisture Threshold to Firebase
+const updateMoisture = (e) => {
+  const newVal = Number(e.target.value);
+  store.updateConfig('moisture_threshold', newVal);
+};
 
-// --- ACTIONS ---
+// Save Time Schedule to Firebase
+const updateTime = (e) => {
+  const newVal = e.target.value; // e.g., "08:00"
+  store.updateConfig('fert_time', newVal);
+};
+
+// --- PUMP ACTIONS ---
 const togglePump = (type) => {
-  // Map 'water' -> 'pump_water' / 'fertilizer' -> 'pump_fert'
   const pumpKey = type === 'water' ? 'pump_water' : 'pump_fert';
-  
-  // Toggle the current state
   const currentState = store.controls[pumpKey];
   store.togglePump(pumpKey, !currentState);
 };
 
-// --- DUMMY CHART DATA ---
+// --- DUMMY CHART DATA (Keep for now) ---
 const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } };
 const tempChartData = { labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'], datasets: [{ label: 'Temperature', backgroundColor: '#ef4444', borderColor: '#ef4444', data: [24, 25, 25, 26, 26, 25], tension: 0.4 }] };
 const soilChartData = { labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25'], datasets: [{ label: 'Soil Moisture', backgroundColor: '#3b82f6', borderColor: '#3b82f6', data: [60, 58, 55, 53, 50, 48], tension: 0.4 }] };

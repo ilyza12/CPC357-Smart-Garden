@@ -1,59 +1,43 @@
-// frontend/src/stores/gardenStore.js
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { db } from '../services/firebaseConfig';
-import { ref as firebaseRef, onValue, set } from "firebase/database";
+import { ref as dbRef, onValue, update } from 'firebase/database';
 
 export const useGardenStore = defineStore('garden', () => {
-  // --- STATE ---
-  const sensors = ref({
-    temperature: 0,
-    humidity: 0,
-    moisture: 0,
-    rain: 0 
-  });
+  // 1. STATE
+  const sensors = ref({ temperature: 0, humidity: 0, moisture: 0, rain: 0 });
+  const controls = ref({ mode: 'MANUAL', pump_water: false, pump_fert: false });
+  // NEW: Config State
+  const config = ref({ moisture_threshold: 30, fert_time: '08:00' }); 
 
-  const controls = ref({
-    pump_water: false,
-    pump_fert: false,
-    mode: 'MANUAL' // 'AUTO' or 'MANUAL'
-  });
-
-  const isConnected = ref(false);
-
-  // --- ACTIONS ---
-  
-  // 1. Listen to Firebase (Run this when app starts)
+  // 2. LISTEN TO FIREBASE
   function initListener() {
-    const gardenRef = firebaseRef(db, 'garden/');
+    const gardenRef = dbRef(db, 'garden');
     
     onValue(gardenRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        isConnected.value = true;
-        if (data.sensors) sensors.value = { ...sensors.value, ...data.sensors };
-        if (data.controls) controls.value = { ...controls.value, ...data.controls };
+        if (data.sensors) sensors.value = data.sensors;
+        if (data.controls) controls.value = data.controls;
+        // NEW: specific check for config
+        if (data.config) config.value = data.config; 
       }
     });
   }
 
-  // 2. Control Pumps
-  async function togglePump(pumpType, status) {
-    try {
-      await set(firebaseRef(db, `garden/controls/${pumpType}`), status);
-    } catch (e) {
-      console.error(e);
-    }
+  // 3. ACTIONS
+  function togglePump(pump, status) {
+    update(dbRef(db, 'garden/controls'), { [pump]: status });
   }
 
-  // 3. Set Mode
-  async function setMode(mode) {
-    try {
-      await set(firebaseRef(db, 'garden/controls/mode'), mode);
-    } catch (e) {
-      console.error(e);
-    }
+  function setMode(newMode) {
+    update(dbRef(db, 'garden/controls'), { mode: newMode });
   }
 
-  return { sensors, controls, isConnected, initListener, togglePump, setMode };
+  // NEW: Action to save thresholds
+  function updateConfig(key, value) {
+    update(dbRef(db, 'garden/config'), { [key]: value });
+  }
+
+  return { sensors, controls, config, initListener, togglePump, setMode, updateConfig };
 });
