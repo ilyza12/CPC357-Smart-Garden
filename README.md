@@ -46,6 +46,13 @@ The system follows a **3-Layer IoT Architecture**:
 
 ### 1. Firmware Setup (ESP32)
 
+```cpp
+#define WIFI_SSID "Your_WiFi_Name"
+#define WIFI_PASSWORD "Your_WiFi_Password"
+#define API_KEY "Your_Firebase_API_Key"
+#define DATABASE_URL "Your_Firebase_Database_URL"
+```
+#### For further detailed explanation on Firmware, refer to the README file under the Firmware folder :)
 
 ### 2. Frontend Setup (Vue.js)
 1.  Navigate to the web app folder:
